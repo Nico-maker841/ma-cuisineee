@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Food Scan & NFC</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f8f9fa; padding: 15px; color: #333; }
+        .container { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        #reader { width: 100%; border-radius: 15px; overflow: hidden; background: #000; margin-bottom: 15px; }
+        .status-badge { padding: 12px; border-radius: 12px; margin: 15px 0; font-weight: 600; font-size: 14px; }
+        .ready { background: #e7f3ff; color: #1877f2; }
+        .success { background: #e7f4e4; color: #258331; }
+        .manual-mode { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        input { width: 100%; padding: 15px; margin: 10px 0; border: 2px solid #ddd; border-radius: 12px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        .btn-nfc { background: #1877f2; color: white; }
+        .btn-nfc:active { transform: scale(0.98); background: #145dbf; }
+        .btn-switch { background: #6c757d; color: white; margin-top: 20px; font-size: 14px; }
+        hr { margin: 25px 0; border: 0; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="margin-top:0;">🍱 Ma Boîte Intelligente</h2>
+    
+    <div id="scanner-container">
+        <div id="reader"></div>
+        <div id="status" class="status-badge ready">Scannez un code-barres ou passez en manuel</div>
+    </div>
+
+    <div id="product-info">
+        <input type="text" id="foodNameInput" placeholder="Nom de l'aliment (ex: Restes Pizza)">
+        <p id="dateDisplay" style="font-size: 14px; color: #666;"></p>
+        <button class="btn-nfc" onclick="writeToNFC()">💾 Enregistrer sur la puce NFC</button>
+    </div>
+
+    <button class="btn-switch" id="toggleMode" onclick="toggleScanner()">📷 Activer/Couper la caméra</button>
+</div>
+
+<script>
+    let isScannerActive = true;
+    let html5QrCode = new Html5Qrcode("reader");
+    const dateToday = new Date().toLocaleDateString('fr-FR');
+    document.getElementById('dateDisplay').innerText = "Date d'aujourd'hui : " + dateToday;
+
+    // Lancer le scanner au démarrage
+    startScanner();
+
+    function startScanner() {
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 150 } },
+            onScanSuccess
+        ).catch(err => console.log("Caméra bloquée ou non trouvée"));
+    }
+
+    async function onScanSuccess(decodedText) {
+        document.getElementById('status').innerText = "Recherche du produit...";
+        document.getElementById('status').className = "status-badge ready";
+        
+        try {
+            const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`);
+            const data = await response.json();
+
+            if (data.status === 1) {
+                const name = data.product.product_name || "Produit inconnu";
+                document.getElementById('foodNameInput').value = name;
+                document.getElementById('status').innerText = "✅ Produit détecté !";
+                document.getElementById('status').className = "status-badge success";
+            } else {
+                document.getElementById('status').innerText = "❌ Inconnu. Entrez le nom manuellement.";
+                document.getElementById('status').className = "status-badge manual-mode";
+            }
+        } catch (e) {
+            alert("Erreur réseau");
+        }
+    }
+
+    function toggleScanner() {
+        if (isScannerActive) {
+            html5QrCode.stop().then(() => {
+                document.getElementById('reader').style.display = 'none';
+                document.getElementById('status').innerText = "Mode Manuel Activé";
+                document.getElementById('status').className = "status-badge manual-mode";
+                document.getElementById('toggleMode').innerText = "📷 Réactiver le scanner";
+                isScannerActive = false;
+            });
+        } else {
+            document.getElementById('reader').style.display = 'block';
+            startScanner();
+            document.getElementById('toggleMode').innerText = "📷 Couper la caméra";
+            isScannerActive = true;
+        }
+    }
+
+    async function writeToNFC() {
+        const foodName = document.getElementById('foodNameInput').value;
+        if (!foodName) {
+            alert("Veuillez saisir ou scanner un nom d'aliment");
+            return;
+        }
+
+        const message = `${foodName} | Ajouté le : ${dateToday}`;
+
+        try {
+            if ("NDEFReader" in window) {
+                const ndef = new NDEFReader();
+                await ndef.scan();
+                document.getElementById('status').innerText = "Approchez le téléphone de la puce...";
+                
+                await ndef.write(message);
+                
+                document.getElementById('status').innerText = "✅ Puce mise à jour avec succès !";
+                document.getElementById('status').className = "status-badge success";
+                
+                // Optionnel : Réinitialiser le champ après 3s
+                setTimeout(() => {
+                    document.getElementById('foodNameInput').value = "";
+                }, 3000);
+            } else {
+                alert("Votre navigateur ne supporte pas le NFC (utilisez Chrome sur Android)");
+            }
+        } catch (error) {
+            alert("Erreur NFC : " + error);
+        }
+    }
+</script>
+
+</body>
+</html>
