@@ -3,145 +3,350 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Food Pro - IA</title>
-    <script src="https://unpkg.com/html5-qrcode"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <title>Simulateur éducatif NFC</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f7f6; padding: 10px; }
-        .container { max-width: 450px; margin: auto; background: white; padding: 15px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-        #reader { width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
-        .btn { width: 100%; padding: 15px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; margin: 5px 0; transition: 0.2s; }
-        .btn-ai { background: #6c5ce7; color: white; border: 2px solid #5b4bc4; }
-        .btn-nfc { background: #1877f2; color: white; font-size: 18px; }
-        .btn-quick { background: #e0e0e0; color: #333; width: 30%; font-size: 12px; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 2px solid #ddd; border-radius: 10px; box-sizing: border-box; }
-        #log { font-size: 12px; color: #666; margin: 10px 0; min-height: 20px; }
-        .item { display: flex; justify-content: space-between; padding: 10px; margin-bottom: 5px; border-radius: 8px; background: white; border-left: 6px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .danger { border-left-color: #ff4757; background: #fff1f2; }
-        .warning { border-left-color: #ffa502; background: #fff9e6; }
-        .fresh { border-left-color: #2ed573; background: #f0fff4; }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .nfc-area {
+            background: #e9ecef;
+            border: 3px dashed #6c757d;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .nfc-area:hover {
+            background: #dee2e6;
+            border-color: #495057;
+        }
+        
+        .nfc-area.active {
+            background: #cce5ff;
+            border-color: #004085;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        
+        .controls {
+            margin: 20px 0;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .log {
+            background: #333;
+            color: #0f0;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <h2 style="color:#2d3436;">🍱 IA Food Manager</h2>
-    
-    <div id="reader"></div>
-    <div id="log">Prêt à scanner...</div>
-
-    <input type="text" id="foodName" placeholder="Nom de l'aliment">
-    
-    <div style="background: #f9f9f9; padding: 10px; border-radius: 15px; border: 1px dashed #6c5ce7;">
-        <button class="btn btn-ai" onclick="readDateWithIA()">🔍 SCANNER LA DATE (IA)</button>
-        <div id="aiStatus" style="font-size: 11px; color: #6c5ce7;"></div>
-        <input type="date" id="expiryDate">
-    </div>
-
-    <button class="btn btn-nfc" onclick="writeToNFC()">💾 ÉCRIRE SUR LA PUCE NFC</button>
-
-    <div style="margin-top:15px;">
-        <p style="font-size:12px; font-weight:bold;">Ou raccourcis rapides :</p>
-        <button class="btn btn-quick" onclick="addDays(3)">+3j</button>
-        <button class="btn btn-quick" onclick="addDays(7)">+7j</button>
-        <button class="btn btn-quick" onclick="addDays(14)">+14j</button>
-    </div>
-
-    <div id="inventory" style="margin-top:20px; text-align:left;"></div>
-</div>
-
-<script>
-    let scanner = new Html5Qrcode("reader");
-    let inventory = JSON.parse(localStorage.getItem('foodStock')) || [];
-
-    // Lancement du scanner Code-barres
-    scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (decoded) => {
-        document.getElementById('log').innerText = "Recherche OpenFoodFacts...";
-        fetch(`https://world.openfoodfacts.org/api/v0/product/${decoded}.json`)
-            .then(r => r.json()).then(d => {
-                if(d.status === 1) {
-                    document.getElementById('foodName').value = d.product.product_name;
-                    document.getElementById('log').innerText = "✅ Produit : " + d.product.product_name;
-                }
-            });
-    });
-
-    // --- FONCTION IA AMÉLIORÉE ---
-    async function readDateWithIA() {
-        const status = document.getElementById('aiStatus');
-        status.innerText = "⏳ Chargement de l'IA (Patience)...";
+    <div class="container">
+        <h1>📱 Simulateur NFC éducatif</h1>
         
-        try {
-            const video = document.querySelector('video');
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
+        <div class="warning">
+            ⚠️ OUTIL ÉDUCATIF UNIQUEMENT - Ce simulateur est conçu pour comprendre 
+            les concepts de sécurité NFC dans un environnement contrôlé.
+            N'utilisez jamais ces techniques sur des systèmes réels sans autorisation.
+        </div>
+        
+        <div class="nfc-area" id="nfcArea">
+            <div style="font-size: 48px;">📱</div>
+            <div style="font-size: 18px; margin-top: 10px;">Zone de simulation NFC</div>
+            <div style="font-size: 14px; color: #666;">Cliquez pour simuler un tag NFC</div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="attemptCount">0</div>
+                <div class="stat-label">Tentatives</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="successCount">0</div>
+                <div class="stat-label">Réussites</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="speed">0</div>
+                <div class="stat-label">Tentatives/s</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button onclick="startBruteforce()" id="startBtn">Démarrer simulation</button>
+            <button onclick="stopBruteforce()" id="stopBtn" disabled>Arrêter</button>
+            <button onclick="resetSimulation()">Réinitialiser</button>
+        </div>
+        
+        <div>
+            <label for="speedControl">Vitesse simulation:</label>
+            <input type="range" id="speedControl" min="1" max="100" value="10">
+            <span id="speedValue">10 ms</span>
+        </div>
+        
+        <div>
+            <label for="targetCode">Code cible (simulé):</label>
+            <input type="text" id="targetCode" value="123456" maxlength="6" pattern="[0-9]*">
+        </div>
+        
+        <h3>Journal des tentatives:</h3>
+        <div class="log" id="log"></div>
+        
+        <div style="margin-top: 20px; font-size: 12px; color: #666;">
+            <p><strong>Comment ça marche :</strong> Ce simulateur montre comment un bruteforceur 
+            tenterait de deviner un code NFC en essayant différentes combinaisons. 
+            Dans la réalité, les systèmes NFC modernes ont des protections contre ce type d'attaque.</p>
+        </div>
+    </div>
 
-            // On lance Tesseract
-            const worker = await Tesseract.createWorker('fra');
-            const { data: { text } } = await worker.recognize(canvas);
-            await worker.terminate();
-
-            status.innerText = "Analyse : " + text.substring(0, 20) + "...";
-
-            // Cherche une date type 25/12/2026 ou 25.12.26
-            const dateMatch = text.match(/(\d{2})[\/\.\-\s](\d{2})[\/\.\-\s](\d{2,4})/);
-            
-            if (dateMatch) {
-                let day = dateMatch[1];
-                let month = dateMatch[2];
-                let year = dateMatch[3].length === 2 ? "20" + dateMatch[3] : dateMatch[3];
-                document.getElementById('expiryDate').value = `${year}-${month}-${day}`;
-                status.innerText = "✅ Date détectée !";
-            } else {
-                status.innerText = "❌ Date non trouvée. Réessaye ou utilise le calendrier.";
+    <script>
+        let isRunning = false;
+        let attempts = 0;
+        let successes = 0;
+        let currentCode = 0;
+        let targetCode = "123456";
+        let intervalId = null;
+        let startTime = null;
+        
+        const nfcArea = document.getElementById('nfcArea');
+        const log = document.getElementById('log');
+        const attemptCount = document.getElementById('attemptCount');
+        const successCount = document.getElementById('successCount');
+        const speedDisplay = document.getElementById('speed');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const speedControl = document.getElementById('speedControl');
+        const speedValue = document.getElementById('speedValue');
+        const targetInput = document.getElementById('targetCode');
+        
+        // Mettre à jour la vitesse affichée
+        speedControl.addEventListener('input', function() {
+            speedValue.textContent = this.value + ' ms';
+            if (isRunning) {
+                restartBruteforce();
             }
-        } catch (e) {
-            status.innerText = "❌ Erreur : " + e.message;
-        }
-    }
-
-    function addDays(days) {
-        let d = new Date();
-        d.setDate(d.getDate() + days);
-        document.getElementById('expiryDate').value = d.toISOString().split('T')[0];
-    }
-
-    async function writeToNFC() {
-        const name = document.getElementById('foodName').value;
-        const date = document.getElementById('expiryDate').value;
-        if(!name || !date) return alert("Nom ou Date manquante");
-
-        try {
-            const ndef = new NDEFReader();
-            await ndef.scan();
-            await ndef.write(`${name} | DLC: ${date}`);
-            
-            inventory.push({ name, date });
-            localStorage.setItem('foodStock', JSON.stringify(inventory));
-            render();
-            alert("Puce gravée !");
-        } catch(e) { alert("NFC Erreur: " + e); }
-    }
-
-    function render() {
-        const div = document.getElementById('inventory');
-        div.innerHTML = "<h4>Stock :</h4>";
-        inventory.forEach((it, i) => {
-            let diff = (new Date(it.date) - new Date()) / 86400000;
-            let cls = diff < 0 ? 'danger' : (diff < 3 ? 'warning' : 'fresh');
-            div.innerHTML += `<div class="item ${cls}">
-                <span><b>${it.name}</b><br><small>Expire : ${it.date}</small></span>
-                <button onclick="del(${i})" style="background:none; border:none; color:red; font-weight:bold;">X</button>
-            </div>`;
         });
-    }
-
-    function del(i) { inventory.splice(i, 1); localStorage.setItem('foodStock', JSON.stringify(inventory)); render(); }
-    render();
-</script>
-
+        
+        targetInput.addEventListener('change', function() {
+            targetCode = this.value.padStart(6, '0');
+        });
+        
+        nfcArea.addEventListener('click', function() {
+            if (!isRunning) {
+                simulateTagDetection();
+            }
+        });
+        
+        function addLog(message, isSuccess = false) {
+            const entry = document.createElement('div');
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            if (isSuccess) {
+                entry.style.color = '#28a745';
+                entry.style.fontWeight = 'bold';
+            }
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            
+            // Limiter le nombre d'entrées dans le log
+            while (log.children.length > 100) {
+                log.removeChild(log.firstChild);
+            }
+        }
+        
+        function simulateTagDetection() {
+            nfcArea.classList.add('active');
+            setTimeout(() => {
+                nfcArea.classList.remove('active');
+            }, 500);
+            
+            const simulatedCode = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+            addLog(`📱 Tag NFC détecté: ${simulatedCode}`);
+        }
+        
+        function generateNextCode() {
+            currentCode = (currentCode + 1) % 1000000;
+            return currentCode.toString().padStart(6, '0');
+        }
+        
+        function attemptBruteforce() {
+            if (!isRunning) return;
+            
+            attempts++;
+            const code = generateNextCode();
+            
+            // Simuler une tentative de bruteforce
+            nfcArea.classList.add('active');
+            
+            setTimeout(() => {
+                nfcArea.classList.remove('active');
+            }, 100);
+            
+            // Vérifier si le code correspond
+            if (code === targetCode) {
+                successes++;
+                addLog(`✅ SUCCÈS! Code trouvé: ${code} après ${attempts} tentatives`, true);
+                stopBruteforce();
+            } else {
+                if (attempts % 100 === 0) {
+                    addLog(`Tentative ${attempts}: ${code} (pas le bon code)`);
+                }
+            }
+            
+            // Mettre à jour les statistiques
+            updateStats();
+            
+            // Calculer la vitesse
+            if (startTime) {
+                const elapsedSeconds = (Date.now() - startTime) / 1000;
+                const speed = attempts / elapsedSeconds;
+                speedDisplay.textContent = speed.toFixed(1);
+            }
+        }
+        
+        function updateStats() {
+            attemptCount.textContent = attempts;
+            successCount.textContent = successes;
+        }
+        
+        function startBruteforce() {
+            if (isRunning) return;
+            
+            isRunning = true;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            startTime = Date.now();
+            currentCode = Math.floor(Math.random() * 1000000); // Point de départ aléatoire
+            
+            addLog(`🚀 Démarrage de la simulation de bruteforce NFC`);
+            addLog(`🎯 Code cible: ${targetCode}`);
+            
+            intervalId = setInterval(attemptBruteforce, parseInt(speedControl.value));
+        }
+        
+        function stopBruteforce() {
+            if (!isRunning) return;
+            
+            isRunning = false;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            
+            addLog(`⏹️ Simulation arrêtée après ${attempts} tentatives`);
+        }
+        
+        function restartBruteforce() {
+            if (isRunning) {
+                stopBruteforce();
+                startBruteforce();
+            }
+        }
+        
+        function resetSimulation() {
+            stopBruteforce();
+            attempts = 0;
+            successes = 0;
+            currentCode = 0;
+            startTime = null;
+            updateStats();
+            speedDisplay.textContent = '0';
+            log.innerHTML = '';
+            addLog('🔄 Simulation réinitialisée');
+        }
+        
+        // Ajouter un exemple de tag NFC simulé au chargement
+        window.onload = function() {
+            addLog('📱 Simulateur NFC prêt. Cliquez sur la zone NFC pour simuler une détection.');
+        };
+    </script>
 </body>
 </html>
